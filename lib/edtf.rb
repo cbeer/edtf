@@ -1,5 +1,5 @@
 require "edtf/version"
 
 module Edtf
-  # Your code goes here...
+  autoload :Parser, 'edtf/parser'
 end
