@@ -15,9 +15,13 @@ class Edtf::Parser < Parslet::Parser
   rule(:separator_interval) { str('/') }
   rule(:separator) { }
 
-  rule(:year) { four_digit_integer.as(:year) }
-  rule(:month) { one_to_twelve.as(:month) }
-  rule(:day) { one_to_thirty_one.as(:day) }
+  rule(:simple_year) { four_digit_integer.as(:year) }
+  rule(:simple_month) { one_to_twelve.as(:month) }
+  rule(:simple_day) { one_to_thirty_one.as(:day) }
+
+  rule(:year) { simple_year | unspecified_year | masked_year }
+  rule(:month) { simple_month | unspecified_month }
+  rule(:day) { simple_day | unspecified_day }
 
   rule(:year_month_day) { year >> separator_dash >> month >> separator_dash >> day }
   rule(:year_month) { year >> separator_dash >> month }
@@ -57,14 +61,38 @@ class Edtf::Parser < Parslet::Parser
     date.as(:uncertain) >> ind_uncertain
   }
 
+  rule(:approximate_year) { 
+     year.as(:uncertain).as(:approximate) >> ind_uncertain >> ind_approximate |
+     year.as(:approximate) >> ind_approximate |
+     year.as(:uncertain) >> ind_uncertain
+  }
+
+  rule(:approximate_year_month) {
+     year_month.as(:uncertain).as(:approximate) >> ind_uncertain >> ind_approximate |
+     year_month.as(:approximate) >> ind_approximate |
+     year_month.as(:uncertain) >> ind_uncertain
+  }
+
   rule(:approximate_date) {
     (uncertain_date).as(:approximate) >> ind_approximate |
     date.as(:approximate) >> ind_approximate
   }
 
-  rule(:uncertain_or_approximate_date) { approximate_date | uncertain_date }
+  rule(:partial_uncertain_or_approximate_date) {
+    approximate_year >> separator_dash >> month_day |
+    approximate_year_month >> separator_dash >> day |
+    approximate_year_month |
+    approximate_year
+  }
+
+  rule(:uncertain_or_approximate_date) { 
+    partial_uncertain_or_approximate_date |
+    approximate_date | 
+    uncertain_date
+  }
 
   rule(:ind_unspecified) { str('u') }
+  rule(:ind_masked) { str('x') }
   rule(:ind_unknown) { str('unknown') }
   rule(:ind_open) { str('open') }
 
@@ -78,6 +106,16 @@ class Edtf::Parser < Parslet::Parser
     ).as(:unspecified).as(:year)
   }
 
+  rule(:masked_year) {
+    (
+      str("-").maybe >>
+      int >> int >> (
+        ind_masked >> ind_masked |
+        int >> ind_masked
+      )
+    ).as(:masked).as(:year)
+  }
+
   rule(:unspecified_year) { underspecified_year }
 
   rule(:unspecified_month) {
@@ -89,10 +127,10 @@ class Edtf::Parser < Parslet::Parser
   }
 
   rule(:unspecified_date) {
-     underspecified_year |
+     (underspecified_year  |
      year >> separator_dash >> unspecified_month >> separator_dash >> unspecified_day |
      year >> separator_dash >> month >> separator_dash >> unspecified_day |
-     year >> separator_dash >> unspecified_month 
+     year >> separator_dash >> unspecified_month) >> any.absnt? 
   }
 
   rule(:extended_date) {
@@ -106,6 +144,10 @@ class Edtf::Parser < Parslet::Parser
   rule(:ind_year) { str('y') }
 
   rule(:long_year) {
+    ind_year >> (int.repeat >> str("e") >> int.repeat(1) >> str('p') >> int.repeat(1)).as(:exponential_form).as(:year) |
+    ind_year >> (str('-') >> int.repeat >> str("e") >> int.repeat(1) >> str('p') >> int.repeat(1)).as(:exponential_form).as(:year) |
+    ind_year >> (int.repeat >> str("e") >> int.repeat).as(:exponential_form).as(:year) |
+    ind_year >> (str('-') >> int.repeat >> str("e") >> int.repeat).as(:exponential_form).as(:year) |
     ind_year >> int.repeat(4).as(:year) |
     ind_year >> (str('-') >> int.repeat(4)).as(:year)
   }
@@ -116,16 +158,19 @@ class Edtf::Parser < Parslet::Parser
   rule(:season_winter) { str('24').as(:winter) }
   rule(:season) { (season_spring | season_summer | season_autumn | season_winter).as(:season) }
 
+  rule(:season_qualifier) { str("^") >> any.repeat.as(:qualifier) }
+  rule(:season_qualifier?) { season_qualifier.maybe }
+
   rule(:seasons) {
-    year >> separator_dash >> season
+    year >> separator_dash >> season >> season_qualifier?
   }
 
   rule(:edtf_level0) {
-     date_time | interval | date
+     interval | date_time | date
   }
 
   rule(:edtf_level1) {
-     uncertain_or_approximate_date | unspecified_date | extended_interval | long_year | seasons
+     extended_interval | uncertain_or_approximate_date | unspecified_date | long_year | seasons
   }
 
   rule(:edtf) {
