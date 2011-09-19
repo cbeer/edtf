@@ -209,4 +209,19 @@ describe Edtf::Parser do
       parser.seasons.should parse('2001-21')
     end
   end
+
+
+  context "edtf" do
+    it "should parse formats" do
+      parser.should parse("2001-02-03")
+      parser.should parse("2001-02-03T09:30:01")
+      parser.should parse("2005/2006-02")
+      parser.should parse("1984?")
+      parser.should parse("199u")
+      parser.should parse("unknown/2004-06~")
+      parser.should parse("y170000002")
+      parser.should parse("2001-21")
+    end
+
+  end
 end

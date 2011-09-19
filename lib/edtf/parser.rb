@@ -42,8 +42,8 @@ class Edtf::Parser < Parslet::Parser
   rule(:timezone) { (timezone_z | timezone_offset).as(:timezone) }
 
   rule(:date_time) {
-    date >> separator_t >> time >> timezone  |
-    date >> separator_t >> time 
+    date >> separator_time >> time >> timezone  |
+    date >> separator_time >> time 
   }
 
   rule(:interval) {
